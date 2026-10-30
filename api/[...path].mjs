@@ -7,9 +7,10 @@ import { timingSafeEqual } from "node:crypto";
 import { inspectSite, toMarkdown } from "../tools/lib/inspect.mjs";
 import { markdownToPdf } from "../tools/lib/pdf.mjs";
 
-const TOKEN = process.env.ATELIER_SETTINGS_TOKEN || "";
+// Les espaces et retours à la ligne collés par erreur autour du jeton dans Vercel sont ignorés
+const TOKEN = (process.env.ATELIER_SETTINGS_TOKEN || "").trim();
 const BACKEND = (process.env.ATELIER_BACKEND_URL || "").trim().replace(/\/$/, "");
-const BACKEND_TOKEN = process.env.ATELIER_BACKEND_TOKEN || "";
+const BACKEND_TOKEN = (process.env.ATELIER_BACKEND_TOKEN || "").trim();
 const PROXY_OK = /^\/api\/(?:state|models|source|gateway|openrouter-key|bulk-model|profile|inspect\/room|report-pdf|agents\/[a-z0-9-]+)$/;
 
 const NO_BACKEND = "Le serveur Atelier Z (VPS) n'est pas relié à cette page. Les outils « Inspecter un site » et « Rapport PDF » (texte collé) fonctionnent ; les agents, la clé et les modèles demandent ATELIER_BACKEND_URL et ATELIER_BACKEND_TOKEN dans les variables Vercel.";
@@ -39,7 +40,12 @@ export default async function handler(req, res) {
   try {
     // Accès : jeton obligatoire, refus par défaut si non configuré
     if (!TOKEN || TOKEN.length < 16) return send(res, 503, { error: "Jeton d'accès non configuré (ATELIER_SETTINGS_TOKEN, 16 caractères minimum)." });
-    if (!sameToken(req.headers["x-atelier-token"])) return send(res, 401, { error: "Jeton d'accès requis" });
+    const given = String(req.headers["x-atelier-token"] || "").trim();
+    if (!sameToken(given)) {
+      // Indice de diagnostic : seule la longueur est révélée, jamais le contenu
+      const hint = given && given.length !== TOKEN.length ? ` (longueur reçue : ${given.length}, attendue : ${TOKEN.length})` : "";
+      return send(res, 401, { error: (given ? "Jeton d'accès refusé" : "Jeton d'accès requis") + hint });
+    }
     if (req.method !== "GET") {
       const origin = req.headers.origin;
       if (origin && new URL(origin).host !== req.headers.host) return send(res, 403, { error: "Origine refusée" });
