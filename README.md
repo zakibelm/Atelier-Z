@@ -89,6 +89,25 @@ Les deux sont aussi dans la page de paramètres (section « Outils de mission »
 
 Limites : lecture HTML seule (pas de JavaScript exécuté, pas de vitesse réelle ni de Core Web Vitals), les incohérences de prix sont une heuristique à confirmer, et les polices du PDF couvrent le français mais pas les emojis ni certains symboles (retirés ou remplacés).
 
+## Déploiement Vercel + VPS
+
+Vercel ne peut pas héberger le salon : OpenMausBot est un serveur qui reste allumé et garde ses données sur disque. Le partage est donc le suivant.
+
+| Où | Quoi |
+|---|---|
+| **Vercel** | La page de paramètres et les outils sans état (inspecter un site, PDF d'un texte collé), derrière un jeton. Aucune clé d'IA ni donnée n'y est stockée. |
+| **VPS** | OpenMausBot (salon, agents, clé), le serveur de paramètres (`tools/settings-server.mjs`) et le PDF du dernier rapport du salon. |
+
+Variables Vercel (Production) :
+- `ATELIER_SETTINGS_TOKEN` : jeton d'accès à la page (16 caractères minimum, de préférence 40 aléatoires). Sans lui, rien ne répond.
+- `ATELIER_BACKEND_URL` : adresse **HTTPS** du serveur de paramètres sur le VPS (ex. `https://atelier.exemple.ca`). Facultatif au départ : sans elle, seuls les outils sans état fonctionnent.
+- `ATELIER_BACKEND_TOKEN` : jeton du serveur de paramètres du VPS (le même que son `ATELIER_SETTINGS_TOKEN`).
+
+Sur le VPS, derrière un proxy HTTPS (exemple Caddy dans [deploy/Caddyfile.example](deploy/Caddyfile.example)) :
+`ATELIER_SETTINGS_TOKEN=<jeton du VPS> node tools/settings-server.mjs` (le serveur reste à l'écoute en local ; seul le proxy est public).
+
+Sécurité : deux jetons distincts (page, puis VPS) ; le jeton ne voyage jamais en HTTP clair ; les routes relayées sont limitées à une liste fixe ; l'inspection refuse les adresses internes. Fais pivoter les jetons si l'un d'eux a circulé dans une conversation.
+
 ## Infrastructure envisagée
 
 - Salle de discussion : OpenMausBot (open source, Apache-2.0, auto-hébergeable) à tester sur le VPS, avec les CLI d'agents (Claude, Codex).

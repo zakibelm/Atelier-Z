@@ -13,3 +13,6 @@ node_modules/
 
 # Données de mission (inspections, rapports) : propres au client, jamais versionnées
 missions/
+
+# Construit par scripts/vercel-build.mjs
+public/

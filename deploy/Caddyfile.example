@@ -1,0 +1,5 @@
+# Proxy HTTPS devant le serveur de paramètres d'Atelier Z (remplace le domaine).
+# Le serveur écoute en local (127.0.0.1:8801) ; seul Caddy est exposé, avec certificat automatique.
+atelier.exemple.ca {
+	reverse_proxy 127.0.0.1:8801
+}

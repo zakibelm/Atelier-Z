@@ -111,8 +111,10 @@
       <div class="row"><button id="bulkBtn" type="button">Appliquer à tous les agents</button></div>
     </section>
 
-    <h2>Outils de mission</h2>
-    <section class="card">
+    <section class="card" id="banner" hidden></section>
+
+    <h2 class="tool">Outils de mission</h2>
+    <section class="card tool">
       <div class="head"><h3>Inspecter un site</h3></div>
       <p class="hint">Lit le site en direct (statut, balises, données structurées, prix, téléphones, robots.txt, sitemap). Les agents s'appuient sur ces faits au lieu de deviner.</p>
       <label for="inspUrl">Adresse du site</label>
@@ -123,7 +125,7 @@
       <textarea id="inspOut" readonly hidden aria-label="Résultat de l'inspection"></textarea>
       <div class="row"><button id="inspRoom" type="button" hidden>Envoyer au salon</button></div>
     </section>
-    <section class="card">
+    <section class="card tool">
       <div class="head"><h3>Rapport PDF</h3></div>
       <p class="hint">Transforme le rapport du Rédacteur en PDF. Relis-le avant de l'envoyer à un client.</p>
       <div class="row" role="radiogroup" aria-label="Source du rapport">
@@ -170,7 +172,7 @@ async function api(method, path, body) {
   const res = await fetch(path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
   const data = await res.json().catch(() => ({}));
   if (res.status === 401) { $("gate").style.display = "block"; $("app").hidden = true; throw new Error(data.error || "Jeton requis"); }
-  if (!res.ok) throw new Error(data.error || "Erreur " + res.status);
+  if (!res.ok) { const err = new Error(data.error || "Erreur " + res.status); err.code = data.code; throw err; }
   return data;
 }
 
@@ -256,10 +258,25 @@ function agentCard(a) {
   return el("article", { class: "card" }, ...body);
 }
 
-async function load() {
-  const [s, mods] = await Promise.all([api("GET", "/api/state"), api("GET", "/api/models")]);
+function backendMode(ok, msg) {
   $("gate").style.display = "none";
   $("app").hidden = false;
+  for (const el of $("app").children) {
+    const keep = el.classList.contains("tool");
+    if (el.id === "banner") { el.hidden = ok; if (!ok) { el.textContent = msg; } continue; }
+    el.hidden = ok ? false : !keep;
+  }
+  if (!ok) { // sans serveur relié, le PDF se fait à partir d'un texte collé
+    document.querySelector("input[name=repSrc][value=paste]").checked = true;
+    $("repText").hidden = false;
+  }
+}
+
+async function load() {
+  let s, mods;
+  try { [s, mods] = await Promise.all([api("GET", "/api/state"), api("GET", "/api/models")]); }
+  catch (e) { if (e.code === "no-backend") { backendMode(false, e.message); return; } throw e; }
+  backendMode(true);
   source = s.provider;
   applySource();
   setKeyStatus(s.openrouterConfigured);
@@ -322,7 +339,7 @@ $("inspBtn").addEventListener("click", async () => {
     $("inspOut").value = r.markdown;
     $("inspOut").hidden = false;
     $("inspRoom").hidden = false;
-    $("inspMeta").textContent = r.pages + " page(s) lue(s), " + r.flags + " constat(s). Données complètes enregistrées dans " + r.savedTo;
+    $("inspMeta").textContent = r.pages + " page(s) lue(s), " + r.flags + " constat(s)." + (r.savedTo ? " Données complètes enregistrées dans " + r.savedTo : " Copie le résumé ou envoie-le au salon : cette version ne garde aucun fichier.");
   } catch (e) { $("inspMeta").textContent = ""; toast(e.message, true); }
   btn.disabled = false;
 });
