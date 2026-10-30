@@ -21,7 +21,22 @@ Le chef d'atelier choisit le mode selon la tâche, ou l'utilisateur l'impose. Le
 
 ## Équipe de départ
 
-Voir [docs/roles.md](docs/roles.md).
+Voir [docs/roles.md](docs/roles.md). Chaque rôle a son skill dans [skills/](skills/) :
+
+| Rôle | Skill |
+|---|---|
+| Orchestrateur expert | [orchestrateur](skills/orchestrateur/SKILL.md) |
+| Chef d'équipe | [chef-atelier](skills/chef-atelier/SKILL.md) |
+| Cadrage | [cadrage](skills/cadrage/SKILL.md) |
+| Chercheur site et technique | [audit-site-technique](skills/audit-site-technique/SKILL.md) |
+| Chercheur contenu et message | [audit-contenu-message](skills/audit-contenu-message/SKILL.md) |
+| Chercheur concurrents | [analyse-concurrents](skills/analyse-concurrents/SKILL.md) |
+| Chercheur audience et GEO | [analyse-audience-geo](skills/analyse-audience-geo/SKILL.md) |
+| Vérificateur | [verification-sources](skills/verification-sources/SKILL.md) |
+| Stratège | [synthese-strategique](skills/synthese-strategique/SKILL.md) |
+| Rédacteur | [redaction-rapport-pdf](skills/redaction-rapport-pdf/SKILL.md) |
+
+Les skills sont des fichiers d'instructions vivants : après chaque retour de l'utilisateur, l'agent concerné met son skill à jour.
 
 ## Règles du salon
 

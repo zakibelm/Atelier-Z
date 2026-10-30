@@ -2,6 +2,8 @@
 
 Chaque agent a une description claire (c'est elle qui dit aux autres ce qu'il fait), un ou plusieurs skills, et des connexions limitées à son besoin.
 
+Les skills de chaque rôle sont dans le dossier [skills/](../skills/) (un dossier par skill, avec un `SKILL.md`). Le chef d'atelier (chef d'équipe) et l'orchestrateur (expert en répartition du travail) travaillent ensemble : le premier anime le salon, le second planifie et délègue.
+
 | Agent | Rôle | Skills (exemples) | Connexions |
 |---|---|---|---|
 | Chef d'atelier | Seul à parler à l'utilisateur, modère le salon, choisit le mode, lance les travaux | Choix du mode, suivi des tâches, arbitrage | Tableau d'état |
