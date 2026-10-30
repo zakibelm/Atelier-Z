@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Installe OpenMausBot et l'équipe Atelier Z (10 bots + salon « Atelier de recherche »).
-# Prérequis : Node 24+, et au moins un CLI d'agent connecté (ex. : `claude login`).
+# Prérequis : Node 24+ et une clé OpenRouter : export OMB_OPENROUTER_API_KEY=sk-or-...
 # Usage : bash scripts/install.sh [port] [dossier-de-données]
 set -euo pipefail
 
@@ -20,6 +20,9 @@ fi
 
 mkdir -p "$DATA"
 if ! curl -fsS "http://127.0.0.1:$PORT/api/bots" >/dev/null 2>&1; then
+  if [ -z "${OMB_OPENROUTER_API_KEY:-}" ]; then
+    echo "Attention : OMB_OPENROUTER_API_KEY n'est pas défini. Les bots seront configurés, mais ne pourront pas répondre via OpenRouter." >&2
+  fi
   nohup openmausbot serve --port "$PORT" --data-dir "$DATA" --label "Atelier Z" --no-pair \
     > "$DATA/server.log" 2>&1 &
   for _ in $(seq 1 30); do
@@ -30,6 +33,7 @@ fi
 
 node "$ROOT/tools/build-team.mjs"
 node "$ROOT/tools/setup-atelier.mjs" "http://127.0.0.1:$PORT"
+node "$ROOT/tools/apply-models.mjs" "http://127.0.0.1:$PORT"
 
 echo
 echo "Atelier Z est prêt sur http://127.0.0.1:$PORT"

@@ -1,0 +1,17 @@
+{
+  "_note": "Attribution des modèles par rôle. Point de départ à valider par test réel (benchmark sur les mêmes missions) avant de figer. Pour changer de fournisseur, modifier 'provider' (identifiant d'instance OpenMausBot) ; pour changer de modèle, modifier la ligne du rôle. Les identifiants viennent des catalogues OpenRouter d'octobre 2026 et doivent être revérifiés.",
+  "provider": "openrouter",
+  "default": "anthropic/claude-sonnet-5.5",
+  "roles": {
+    "chef-atelier": { "model": "anthropic/claude-sonnet-5.5", "why": "Modération et arbitrage : fiabilité et jugement avant le coût" },
+    "orchestrateur": { "model": "anthropic/claude-sonnet-5.5", "why": "Planification et délégation : erreurs coûteuses en aval" },
+    "cadrage": { "model": "deepseek/deepseek-v4.1-flash", "why": "Questions courtes, faible coût" },
+    "audit-site-technique": { "model": "deepseek/deepseek-v4-pro-0813", "why": "Analyse technique détaillée à bon rapport qualité-prix" },
+    "audit-contenu-message": { "model": "google/gemini-3.8-flash", "why": "Lecture de contenu et de visuels, rapide, autre famille de modèles" },
+    "analyse-concurrents": { "model": "deepseek/deepseek-v4.1-flash", "why": "Recherche volumineuse, coût minimal" },
+    "analyse-audience-geo": { "model": "google/gemini-3.8-flash", "why": "Analyse d'audience et de visibilité, rapide" },
+    "verification-sources": { "model": "anthropic/claude-sonnet-5.5", "why": "Famille différente des chercheurs : contre-vérification indépendante" },
+    "synthese-strategique": { "model": "anthropic/claude-sonnet-5.5", "why": "Synthèse et recommandations : option de passer à claude-opus-5.5 pour les gros dossiers" },
+    "redaction-rapport-pdf": { "model": "anthropic/claude-sonnet-5.5", "why": "Qualité de rédaction du livrable client" }
+  }
+}
