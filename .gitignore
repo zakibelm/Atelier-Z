@@ -1,0 +1,8 @@
+# Secrets : ne jamais pousser
+.env
+.env.*
+!.env.example
+
+# Données locales du serveur
+data/
+node_modules/

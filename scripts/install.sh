@@ -9,6 +9,11 @@ PROFILE="${ATELIER_PROFILE:-test}"   # test = modèles bon marché ; prod = conf
 DATA="${2:-$HOME/.atelier-z/data}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
+# Charge la clé depuis .env si présent (le fichier n'est jamais versionné)
+if [ -f "$ROOT/.env" ]; then
+  set -a; . "$ROOT/.env"; set +a
+fi
+
 node_major="$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)"
 if [ "$node_major" -lt 24 ]; then
   echo "Node 24+ requis (version actuelle : $(node -v 2>/dev/null || echo aucune)). Installe-le puis relance." >&2
