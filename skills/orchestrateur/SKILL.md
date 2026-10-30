@@ -31,8 +31,12 @@ Règle : le mode le moins cher qui répond au besoin. L'utilisateur peut imposer
 1. Lire la mission et l'objectif client (notoriété, ventes ou rendez-vous). S'il manque, déléguer au cadrage.
 2. Proposer le plan (modes, agents, budget) ; l'appliquer sauf refus de l'utilisateur.
 3. Lancer les tâches, publier chaque résultat dans le salon, mettre à jour le tableau d'état.
-4. Envoyer les constats critiques au vérificateur avant la stratégie.
-5. Déclencher la rédaction du rapport seulement sur demande.
+4. Avant la recherche technique et contenu, vérifier qu'une inspection réelle du site est dans le salon ; sinon demander à l'utilisateur de la lancer (« Inspecter un site », page de paramètres) et attendre.
+5. Envoyer les constats critiques au vérificateur avant la stratégie.
+6. Déclencher la rédaction du rapport seulement sur demande.
+
+## Salon léger
+Le salon reçoit des résumés décisionnels d'une page au plus. Les données brutes (inspections complètes, tableaux) restent dans les fichiers de mission (`missions/<client>/`) et ne sont jamais recopiées dans le fil.
 
 ## Garde-fous
 - Aucun agent n'est relancé deux fois sur la même tâche sans nouvelle information.

@@ -5,6 +5,9 @@ description: Audit du contenu et du message pour Atelier Z : clarté de l'offre,
 
 # Audit contenu et message
 
+## Données réelles (obligatoire)
+Appuie-toi sur l'inspection du site publiée dans le salon (outil `inspect-url`) : titres, H1, méta-descriptions, appels à l'action détectés, prix, téléphones. Sans inspection, demande-la à l'Orchestrateur avant de noter quoi que ce soit, et n'évalue jamais un texte que tu n'as pas sous les yeux.
+
 ## Grille (niveaux fixes : absent, partiel, complet)
 1. Proposition de valeur comprise en moins de cinq secondes
 2. Offre et prix lisibles

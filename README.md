@@ -76,6 +76,19 @@ Les choix de modèles faits dans la page sont gardés dans `config/models.local.
 
 Accès depuis une tablette : démarrer la page avec `ATELIER_SETTINGS_HOST=0.0.0.0 ATELIER_SETTINGS_TOKEN=<jeton long> node tools/settings-server.mjs`, la placer derrière un accès chiffré (tunnel ou domaine en HTTPS) et ne jamais l'exposer en clair sur Internet. Sans jeton, toute requête qui ne vient pas de la machine locale est refusée.
 
+## Outils de mission
+
+Les agents lisent ce que les outils leur donnent, ils ne devinent pas.
+
+- **`inspect-url`** : lit un site en direct (statut HTTP, title, méta-description, H1, images sans alt, JSON-LD, prix et téléphones par page, robots.txt, sitemap) et signale les écarts entre pages. Lecture seule, sobre, avec garde contre les adresses internes. Les données complètes vont dans `missions/<site>-<date>/` (non versionné) ; seul un résumé d'une page est publié dans le salon.
+  `node tools/inspect-url.mjs https://exemple.ca --pages 5 --out missions/client --room`
+- **`export-report`** : transforme le rapport Markdown du Rédacteur en PDF (titres, listes, tableaux avec gravités en couleur, pagination).
+  `node tools/export-report.mjs rapport.md --client "Nom du client" --out rapport.pdf`
+
+Les deux sont aussi dans la page de paramètres (section « Outils de mission ») : « Inspecter un site », « Envoyer au salon » et « Rapport PDF » (dernier rapport du Rédacteur, ou texte collé). Ça marche donc depuis une tablette.
+
+Limites : lecture HTML seule (pas de JavaScript exécuté, pas de vitesse réelle ni de Core Web Vitals), les incohérences de prix sont une heuristique à confirmer, et les polices du PDF couvrent le français mais pas les emojis ni certains symboles (retirés ou remplacés).
+
 ## Infrastructure envisagée
 
 - Salle de discussion : OpenMausBot (open source, Apache-2.0, auto-hébergeable) à tester sur le VPS, avec les CLI d'agents (Claude, Codex).

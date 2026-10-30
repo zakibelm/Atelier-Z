@@ -10,3 +10,6 @@ config/provider.local.json
 # Données locales du serveur
 data/
 node_modules/
+
+# Données de mission (inspections, rapports) : propres au client, jamais versionnées
+missions/

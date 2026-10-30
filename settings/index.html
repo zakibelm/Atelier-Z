@@ -37,6 +37,8 @@
   #gate { display:none; }
   label.choice { display:inline-flex; align-items:center; gap:8px; font-weight:400; margin:0; min-height:44px; padding:0 12px; border:1px solid var(--line); border-radius:8px; cursor:pointer; }
   label.choice input { width:20px; height:20px; }
+  select { font:inherit; color:inherit; background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:10px 12px; min-height:44px; }
+  #inspOut { min-height:260px; margin-top:12px; }
 </style>
 </head>
 <body>
@@ -107,6 +109,34 @@
       <label for="bulkModel">Modèle à appliquer aux 10 agents</label>
       <input type="text" id="bulkModel" list="modelList" autocomplete="off" spellcheck="false">
       <div class="row"><button id="bulkBtn" type="button">Appliquer à tous les agents</button></div>
+    </section>
+
+    <h2>Outils de mission</h2>
+    <section class="card">
+      <div class="head"><h3>Inspecter un site</h3></div>
+      <p class="hint">Lit le site en direct (statut, balises, données structurées, prix, téléphones, robots.txt, sitemap). Les agents s'appuient sur ces faits au lieu de deviner.</p>
+      <label for="inspUrl">Adresse du site</label>
+      <input type="text" id="inspUrl" placeholder="https://www.exemple.ca" autocomplete="off" spellcheck="false" inputmode="url">
+      <label for="inspPages">Pages à lire</label>
+      <select id="inspPages"><option value="1">1 (page d'accueil)</option><option value="3">3</option><option value="5" selected>5</option><option value="10">10</option></select>
+      <div class="row"><button class="primary" id="inspBtn" type="button">Lire le site</button><span id="inspMeta" class="hint"></span></div>
+      <textarea id="inspOut" readonly hidden aria-label="Résultat de l'inspection"></textarea>
+      <div class="row"><button id="inspRoom" type="button" hidden>Envoyer au salon</button></div>
+    </section>
+    <section class="card">
+      <div class="head"><h3>Rapport PDF</h3></div>
+      <p class="hint">Transforme le rapport du Rédacteur en PDF. Relis-le avant de l'envoyer à un client.</p>
+      <div class="row" role="radiogroup" aria-label="Source du rapport">
+        <label class="choice"><input type="radio" name="repSrc" value="room" checked> Dernier rapport du Rédacteur (salon)</label>
+        <label class="choice"><input type="radio" name="repSrc" value="paste"> Coller le texte</label>
+      </div>
+      <textarea id="repText" hidden aria-label="Rapport en Markdown" placeholder="Colle ici le rapport (Markdown)"></textarea>
+      <label for="repTitle">Titre (facultatif)</label>
+      <input type="text" id="repTitle" placeholder="Rapport d'audit marketing" autocomplete="off">
+      <label for="repClient">Client (facultatif)</label>
+      <input type="text" id="repClient" autocomplete="off">
+      <div class="row"><label class="choice"><input type="checkbox" id="repDraft"> Mention « brouillon, à valider »</label></div>
+      <div class="row"><button class="primary" id="repBtn" type="button">Générer le PDF</button></div>
     </section>
 
     <h2>Agents</h2>
@@ -272,6 +302,54 @@ for (const [id, profile] of [["profTest", "test"], ["profProd", "prod"]]) {
     catch (e) { toast(e.message, true); }
   });
 }
+async function apiBlob(path, body) {
+  const headers = { "x-requested-with": "atelier-z", "content-type": "application/json" };
+  if (token) headers["x-atelier-token"] = token;
+  const res = await fetch(path, { method: "POST", headers, body: JSON.stringify(body) });
+  if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.error || "Erreur " + res.status); }
+  const cd = res.headers.get("content-disposition") || "";
+  const name = (cd.match(/filename="([^"]+)"/) || [])[1] || "rapport.pdf";
+  return { blob: await res.blob(), name };
+}
+$("inspBtn").addEventListener("click", async () => {
+  const btn = $("inspBtn");
+  const url = $("inspUrl").value.trim();
+  if (!url) { toast("Saisis l'adresse du site", true); return; }
+  btn.disabled = true;
+  $("inspMeta").textContent = "Lecture en cours, cela peut prendre une minute…";
+  try {
+    const r = await api("POST", "/api/inspect", { url, pages: $("inspPages").value });
+    $("inspOut").value = r.markdown;
+    $("inspOut").hidden = false;
+    $("inspRoom").hidden = false;
+    $("inspMeta").textContent = r.pages + " page(s) lue(s), " + r.flags + " constat(s). Données complètes enregistrées dans " + r.savedTo;
+  } catch (e) { $("inspMeta").textContent = ""; toast(e.message, true); }
+  btn.disabled = false;
+});
+$("inspRoom").addEventListener("click", async () => {
+  try { await api("POST", "/api/inspect/room", { markdown: $("inspOut").value }); toast("Résumé envoyé au salon"); }
+  catch (e) { toast(e.message, true); }
+});
+document.querySelectorAll("input[name=repSrc]").forEach((r) => {
+  r.addEventListener("change", () => { $("repText").hidden = document.querySelector("input[name=repSrc]:checked").value !== "paste"; });
+});
+$("repBtn").addEventListener("click", async () => {
+  const btn = $("repBtn");
+  const fromRoom = document.querySelector("input[name=repSrc]:checked").value === "room";
+  btn.disabled = true;
+  try {
+    const { blob, name } = await apiBlob("/api/report-pdf", { fromRoom, markdown: $("repText").value, title: $("repTitle").value.trim(), client: $("repClient").value.trim(), draft: $("repDraft").checked });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    document.body.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+    toast("PDF généré : " + name);
+  } catch (e) { toast(e.message, true); }
+  btn.disabled = false;
+});
 document.querySelectorAll("input[name=source]").forEach((r) => {
   r.addEventListener("change", async () => {
     if (!r.checked) return;

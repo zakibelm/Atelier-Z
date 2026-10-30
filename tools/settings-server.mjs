@@ -6,7 +6,7 @@
 // La clé OpenRouter est transmise à OpenMausBot (stockée dans son dossier de données, côté utilisateur).
 // Elle n'est jamais écrite dans le dépôt, ni renvoyée par cette API.
 import http from "node:http";
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { timingSafeEqual } from "node:crypto";
 import {
@@ -14,12 +14,15 @@ import {
   loadProfile, loadLocal, saveLocalModel, clearLocalModels, modelFor, MODEL_ID,
   PROVIDERS, getProvider, setProvider, modelIdOk,
 } from "./lib/team.mjs";
+import { inspectSite, toMarkdown } from "./lib/inspect.mjs";
+import { markdownToPdf } from "./lib/pdf.mjs";
+import { postToRoom, lastReport } from "./lib/room.mjs";
 
 const OMB = (process.env.OMB_URL || "http://127.0.0.1:8799").replace(/\/$/, "");
 const PORT = Number(process.env.ATELIER_SETTINGS_PORT || 8801);
 const HOST = process.env.ATELIER_SETTINGS_HOST || "127.0.0.1";
 const TOKEN = process.env.ATELIER_SETTINGS_TOKEN || "";
-const MAX_BODY = 64 * 1024;
+const MAX_BODY = 512 * 1024;
 const MAX_SKILL = 20000;
 const page = readFileSync(join(root, "settings", "index.html"));
 
@@ -272,6 +275,46 @@ async function route(req, url) {
     return { saved: true, profile };
   }
 
+  // --- Outils de mission ---
+  if (req.method === "POST" && p === "/api/inspect") {
+    const { url: target, pages } = await readBody(req);
+    if (typeof target !== "string" || target.length > 2048) throw new HttpError(400, "Adresse manquante");
+    const n = Math.min(Math.max(parseInt(pages, 10) || 1, 1), 10);
+    let data;
+    try { data = await inspectSite(target.trim(), { pages: n, allowPrivate: process.env.ATELIER_INSPECT_ALLOW_PRIVATE === "1" }); } catch (e) { throw new HttpError(400, e.message); }
+    const md = toMarkdown(data);
+    const slug = new URL(data.startUrl).hostname.replace(/[^a-z0-9.-]/gi, "-") + "-" + data.inspectedAt.slice(0, 10);
+    const dir = join(root, "missions", slug);
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "inspection.json"), JSON.stringify(data, null, 2) + "\n");
+    writeFileSync(join(dir, "inspection.md"), md + "\n");
+    return { markdown: md, savedTo: `missions/${slug}/`, pages: data.pages.length, flags: data.flags.length };
+  }
+
+  if (req.method === "POST" && p === "/api/inspect/room") {
+    const { markdown } = await readBody(req);
+    if (typeof markdown !== "string" || !markdown.trim()) throw new HttpError(400, "Rien à envoyer");
+    try { await postToRoom(OMB, "Données d'inspection réelles (inspect-url). Chercheur site et technique : appuie-toi uniquement sur ces faits.\n\n" + markdown.slice(0, 7000)); }
+    catch (e) { throw new HttpError(502, e.message); }
+    return { saved: true };
+  }
+
+  if (req.method === "POST" && p === "/api/report-pdf") {
+    const { markdown, fromRoom, title, client, draft } = await readBody(req);
+    let md = typeof markdown === "string" ? markdown : "";
+    if (fromRoom) {
+      try { md = (await lastReport(OMB)) || ""; } catch (e) { throw new HttpError(502, e.message); }
+      if (!md) throw new HttpError(404, "Aucun rapport du Rédacteur dans le salon. Demande-lui d'abord « génère le rapport », ou colle le texte.");
+    }
+    if (!md.trim()) throw new HttpError(400, "Le rapport est vide");
+    if (md.length > 400000) throw new HttpError(413, "Rapport trop volumineux");
+    const t = typeof title === "string" ? title.slice(0, 160) : "";
+    const c = typeof client === "string" ? client.slice(0, 120) : "";
+    const buf = await markdownToPdf(md, { title: t, client: c, draft: !!draft });
+    const name = ((t || c || "rapport").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "rapport") + ".pdf";
+    return { __pdf: buf, filename: name };
+  }
+
   throw new HttpError(404, "Route inconnue");
 }
 
@@ -292,7 +335,12 @@ const server = http.createServer(async (req, res) => {
       return res.end(page);
     }
     authorize(req);
-    send(200, await route(req, url));
+    const out = await route(req, url);
+    if (out && out.__pdf) {
+      res.writeHead(200, { "content-type": "application/pdf", "content-disposition": `attachment; filename="${out.filename}"`, "cache-control": "no-store", "content-length": out.__pdf.length });
+      return res.end(out.__pdf);
+    }
+    send(200, out);
   } catch (e) {
     send(e.status || 500, { error: e.status ? e.message : "Erreur interne" });
     if (!e.status) console.error(e);

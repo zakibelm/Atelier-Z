@@ -41,6 +41,9 @@ node "$ROOT/tools/build-team.mjs"
 node "$ROOT/tools/setup-atelier.mjs" "http://127.0.0.1:$PORT"
 node "$ROOT/tools/apply-models.mjs" "http://127.0.0.1:$PORT" --profile "$PROFILE"
 
+# Dépendances des outils (export PDF)
+(cd "$ROOT" && npm install --omit=dev --no-audit --no-fund >/dev/null)
+
 SETTINGS_PORT="${ATELIER_SETTINGS_PORT:-8801}"
 if ! curl -fsS "http://127.0.0.1:$SETTINGS_PORT/" >/dev/null 2>&1; then
   OMB_URL="http://127.0.0.1:$PORT" nohup node "$ROOT/tools/settings-server.mjs" > "$DATA/settings.log" 2>&1 &
