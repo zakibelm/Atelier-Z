@@ -63,6 +63,18 @@ Pour modifier un rôle : éditer son `skills/<nom>/SKILL.md`, puis relancer `nod
 
 État du test (2026-10-30) : installation, création du salon et attribution des modèles vérifiées (10 bots, salon configuré). Aucun échange réel avec les agents n'a encore été testé : il manquait une clé de modèle dans l'environnement de test. À valider sur le VPS avec la clé OpenRouter.
 
+## Page de paramètres
+
+`bash scripts/install.sh` démarre aussi la page de paramètres (`tools/settings-server.mjs`, port 8801, écoute locale seulement). Elle permet de :
+
+- **saisir ta clé OpenRouter** : elle est testée puis transmise à OpenMausBot, qui la garde dans son dossier de données. Elle n'est jamais écrite dans le dépôt ni réaffichée ;
+- **choisir le modèle d'IA de chaque agent** : liste complète d'OpenRouter avec les prix par million de jetons (saisie libre possible), ou profil rapide test / production ;
+- **modifier le skill de chaque agent** : le fichier `skills/<agent>/SKILL.md` est mis à jour et les instructions du bot sont appliquées tout de suite.
+
+Les choix de modèles faits dans la page sont gardés dans `config/models.local.json` (non versionné) et priment sur les profils.
+
+Accès depuis une tablette : démarrer la page avec `ATELIER_SETTINGS_HOST=0.0.0.0 ATELIER_SETTINGS_TOKEN=<jeton long> node tools/settings-server.mjs`, la placer derrière un accès chiffré (tunnel ou domaine en HTTPS) et ne jamais l'exposer en clair sur Internet. Sans jeton, toute requête qui ne vient pas de la machine locale est refusée.
+
 ## Infrastructure envisagée
 
 - Salle de discussion : OpenMausBot (open source, Apache-2.0, auto-hébergeable) à tester sur le VPS, avec les CLI d'agents (Claude, Codex).

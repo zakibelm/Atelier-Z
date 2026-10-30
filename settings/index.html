@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Atelier Z · Paramètres</title>
+<style>
+  :root { --bg:#f6f7f9; --card:#fff; --ink:#15181d; --muted:#5b6472; --line:#dde1e7; --accent:#2f5bea; --accent-ink:#fff; --ok:#17803d; --bad:#b42318; --warn:#9a6700; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#0f1115; --card:#181b21; --ink:#e8eaee; --muted:#9aa3b2; --line:#2b3039; --accent:#7ea0ff; --accent-ink:#0b1020; --ok:#4ade80; --bad:#f87171; --warn:#fbbf24; } }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+  main { max-width:880px; margin:0 auto; padding:16px 16px 96px; }
+  h1 { font-size:22px; margin:8px 0 2px; }
+  h2 { font-size:18px; margin:28px 0 10px; }
+  p.lead { color:var(--muted); margin:0 0 8px; }
+  section.card, article.card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; margin:12px 0; }
+  label { display:block; font-weight:600; margin:12px 0 6px; }
+  input[type=text], input[type=password], textarea { width:100%; font:inherit; color:inherit; background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:10px 12px; min-height:44px; }
+  textarea { font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:14px; line-height:1.45; min-height:220px; resize:vertical; }
+  input:focus, textarea:focus, button:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
+  button { font:inherit; min-height:44px; padding:8px 16px; border-radius:8px; border:1px solid var(--line); background:var(--card); color:var(--ink); cursor:pointer; }
+  button.primary { background:var(--accent); color:var(--accent-ink); border-color:var(--accent); font-weight:600; }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:10px; }
+  .grow { flex:1 1 220px; }
+  .hint { color:var(--muted); font-size:14px; margin:4px 0 0; }
+  .badge { display:inline-block; font-size:13px; padding:2px 8px; border-radius:999px; border:1px solid var(--line); }
+  .badge.ok { color:var(--ok); border-color:var(--ok); }
+  .badge.off { color:var(--warn); border-color:var(--warn); }
+  .badge.dirty { color:var(--warn); border-color:var(--warn); }
+  .head { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; flex-wrap:wrap; }
+  .head h3 { margin:0; font-size:17px; }
+  .head p { margin:2px 0 0; color:var(--muted); font-size:14px; }
+  details > summary { cursor:pointer; font-weight:600; min-height:44px; display:flex; align-items:center; }
+  #toast { position:fixed; left:16px; right:16px; bottom:16px; max-width:560px; margin:0 auto; padding:12px 16px; border-radius:10px; background:var(--ink); color:var(--bg); display:none; z-index:10; }
+  #toast.bad { background:var(--bad); color:#fff; }
+  #gate { display:none; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Atelier Z · Paramètres</h1>
+  <p class="lead">Clé OpenRouter, modèle d'IA et skill de chaque agent.</p>
+
+  <section class="card" id="gate" aria-label="Accès">
+    <label for="token">Jeton d'accès</label>
+    <input type="password" id="token" autocomplete="off">
+    <div class="row"><button class="primary" id="tokenBtn" type="button">Entrer</button></div>
+  </section>
+
+  <div id="app" hidden>
+    <h2>Clé OpenRouter</h2>
+    <section class="card">
+      <div class="head">
+        <div><strong>Statut</strong> <span id="keyStatus" class="badge off">non configurée</span></div>
+      </div>
+      <label for="key">Ta clé OpenRouter</label>
+      <input type="password" id="key" placeholder="sk-or-..." autocomplete="off" spellcheck="false">
+      <p class="hint">La clé est enregistrée dans le dossier de données d'OpenMausBot, sur ta machine. Elle n'est jamais écrite dans le dépôt et n'est plus jamais affichée. Pour limiter les risques, crée une clé avec un plafond de dépenses dans ton compte OpenRouter.</p>
+      <div class="row">
+        <button class="primary" id="keySave" type="button">Tester et enregistrer</button>
+        <button id="keyClear" type="button">Effacer la clé</button>
+      </div>
+    </section>
+
+    <h2>Profil rapide</h2>
+    <section class="card">
+      <p class="lead">Applique d'un coup un modèle à tous les agents. Efface tes choix individuels.</p>
+      <div class="row">
+        <button id="profTest" type="button">Test (bon marché)</button>
+        <button id="profProd" type="button">Production (qualité)</button>
+      </div>
+    </section>
+
+    <h2>Agents</h2>
+    <p class="hint" id="modelsHint"></p>
+    <div id="agents"></div>
+  </div>
+</main>
+<datalist id="modelList"></datalist>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+let token = sessionStorage.getItem("atelierToken") || "";
+let catalog = new Map();
+
+function toast(msg, bad) {
+  const t = $("toast");
+  t.textContent = msg;
+  t.className = bad ? "bad" : "";
+  t.style.display = "block";
+  clearTimeout(toast.t);
+  toast.t = setTimeout(() => { t.style.display = "none"; }, bad ? 7000 : 3500);
+}
+
+async function api(method, path, body) {
+  const headers = { "x-requested-with": "atelier-z" };
+  if (token) headers["x-atelier-token"] = token;
+  if (body !== undefined) headers["content-type"] = "application/json";
+  const res = await fetch(path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
+  const data = await res.json().catch(() => ({}));
+  if (res.status === 401) { $("gate").style.display = "block"; $("app").hidden = true; throw new Error(data.error || "Jeton requis"); }
+  if (!res.ok) throw new Error(data.error || "Erreur " + res.status);
+  return data;
+}
+
+function el(tag, props, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(props || {})) {
+    if (k === "class") e.className = v; else if (k === "text") e.textContent = v; else e.setAttribute(k, v);
+  }
+  for (const k of kids) e.append(k);
+  return e;
+}
+
+function priceText(id) {
+  const m = catalog.get(id);
+  if (!m) return "Identifiant libre : fournisseur/modèle";
+  const parts = [];
+  if (m.in !== null && m.out !== null) parts.push(m.in === 0 && m.out === 0 ? "gratuit" : "US$ " + m.in + " entrée / US$ " + m.out + " sortie par million de jetons");
+  if (m.context) parts.push("contexte " + Number(m.context).toLocaleString("fr-CA"));
+  return parts.join(" · ") || m.name;
+}
+
+function setKeyStatus(ok) {
+  const b = $("keyStatus");
+  b.textContent = ok ? "configurée" : "non configurée";
+  b.className = "badge " + (ok ? "ok" : "off");
+}
+
+function agentCard(a) {
+  const modelIn = el("input", { type: "text", id: "m-" + a.key, list: "modelList", autocomplete: "off", spellcheck: "false", value: a.model });
+  const modelHint = el("p", { class: "hint", text: priceText(a.model) });
+  const modelBtn = el("button", { type: "button", class: "primary", text: "Enregistrer le modèle" });
+  modelIn.addEventListener("input", () => { modelHint.textContent = priceText(modelIn.value.trim()); });
+  modelBtn.addEventListener("click", async () => {
+    modelBtn.disabled = true;
+    try { await api("PUT", "/api/agents/" + a.key, { model: modelIn.value.trim() }); toast(a.name + " : modèle enregistré"); badge.textContent = "modèle personnalisé"; }
+    catch (e) { toast(e.message, true); }
+    modelBtn.disabled = false;
+  });
+
+  const ta = el("textarea", { id: "s-" + a.key, spellcheck: "false", "aria-label": "Skill de " + a.name });
+  ta.value = a.skill;
+  let saved = a.skill;
+  const dirty = el("span", { class: "badge dirty", text: "modifié, non enregistré" });
+  dirty.hidden = true;
+  ta.addEventListener("input", () => { dirty.hidden = ta.value === saved; });
+  const skillBtn = el("button", { type: "button", class: "primary", text: "Enregistrer le skill" });
+  const undoBtn = el("button", { type: "button", text: "Annuler les changements" });
+  undoBtn.addEventListener("click", () => { ta.value = saved; dirty.hidden = true; });
+  skillBtn.addEventListener("click", async () => {
+    skillBtn.disabled = true;
+    try { await api("PUT", "/api/agents/" + a.key, { skill: ta.value }); saved = ta.value; dirty.hidden = true; toast(a.name + " : skill enregistré et appliqué au bot"); }
+    catch (e) { toast(e.message, true); }
+    skillBtn.disabled = false;
+  });
+
+  const badge = el("span", { class: "badge", text: a.customModel ? "modèle personnalisé" : "modèle du profil" });
+  const details = el("details", null,
+    el("summary", { text: "Skill (instructions de l'agent)" }),
+    el("p", { class: "hint", text: "Garde l'en-tête entre --- (name et description). Le texte en dessous devient les instructions permanentes du bot." }),
+    ta,
+    el("div", { class: "row" }, skillBtn, undoBtn, dirty));
+
+  const head = el("div", { class: "head" },
+    el("div", null, el("h3", { text: a.name }), el("p", { text: a.title })),
+    badge);
+  const body = a.present
+    ? [head, el("label", { for: "m-" + a.key, text: "Modèle d'IA (OpenRouter)" }), modelIn, modelHint,
+       el("div", { class: "row" }, modelBtn), details]
+    : [head, el("p", { class: "hint", text: "Ce bot n'existe pas encore dans OpenMausBot. Lance scripts/install.sh." })];
+  return el("article", { class: "card" }, ...body);
+}
+
+async function load() {
+  const [s, mods] = await Promise.all([api("GET", "/api/state"), api("GET", "/api/models")]);
+  $("gate").style.display = "none";
+  $("app").hidden = false;
+  setKeyStatus(s.openrouterConfigured);
+  catalog = new Map(mods.models.map((m) => [m.id, m]));
+  const dl = $("modelList");
+  dl.textContent = "";
+  for (const m of mods.models) dl.append(el("option", { value: m.id, label: m.name }));
+  $("modelsHint").textContent = mods.live
+    ? mods.models.length + " modèles disponibles : tape pour chercher, ou saisis un identifiant fournisseur/modèle."
+    : "Catalogue OpenRouter indisponible : seuls les modèles suggérés sont listés, mais tu peux saisir n'importe quel identifiant fournisseur/modèle.";
+  const box = $("agents");
+  box.textContent = "";
+  for (const a of s.agents) box.append(agentCard(a));
+}
+
+$("keySave").addEventListener("click", async () => {
+  const input = $("key");
+  const btn = $("keySave");
+  btn.disabled = true;
+  try {
+    const r = await api("PUT", "/api/openrouter-key", { key: input.value });
+    input.value = "";
+    setKeyStatus(!r.cleared);
+    toast(r.cleared ? "Clé effacée" : r.verified ? "Clé vérifiée et enregistrée" : "Clé enregistrée, mais OpenRouter n'a pas pu être joint pour la vérifier", !r.cleared && !r.verified);
+  } catch (e) { toast(e.message, true); }
+  btn.disabled = false;
+});
+$("keyClear").addEventListener("click", async () => {
+  try { await api("PUT", "/api/openrouter-key", { key: "" }); $("key").value = ""; setKeyStatus(false); toast("Clé effacée"); }
+  catch (e) { toast(e.message, true); }
+});
+for (const [id, profile] of [["profTest", "test"], ["profProd", "prod"]]) {
+  $(id).addEventListener("click", async () => {
+    if (!confirm("Appliquer le profil « " + profile + " » à tous les agents ? Tes choix individuels seront effacés.")) return;
+    try { await api("POST", "/api/profile", { profile }); toast("Profil " + profile + " appliqué"); await load(); }
+    catch (e) { toast(e.message, true); }
+  });
+}
+$("tokenBtn").addEventListener("click", () => {
+  token = $("token").value.trim();
+  sessionStorage.setItem("atelierToken", token);
+  load().catch((e) => toast(e.message, true));
+});
+
+load().catch((e) => { if (!/Jeton/.test(e.message)) toast(e.message, true); });
+</script>
+</body>
+</html>

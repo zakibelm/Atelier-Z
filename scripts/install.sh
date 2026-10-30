@@ -41,6 +41,13 @@ node "$ROOT/tools/build-team.mjs"
 node "$ROOT/tools/setup-atelier.mjs" "http://127.0.0.1:$PORT"
 node "$ROOT/tools/apply-models.mjs" "http://127.0.0.1:$PORT" --profile "$PROFILE"
 
+SETTINGS_PORT="${ATELIER_SETTINGS_PORT:-8801}"
+if ! curl -fsS "http://127.0.0.1:$SETTINGS_PORT/" >/dev/null 2>&1; then
+  OMB_URL="http://127.0.0.1:$PORT" nohup node "$ROOT/tools/settings-server.mjs" > "$DATA/settings.log" 2>&1 &
+  sleep 1
+fi
+
 echo
+echo "Page de paramètres (clé OpenRouter, modèle et skill de chaque agent) : http://127.0.0.1:$SETTINGS_PORT"
 echo "Atelier Z est prêt sur http://127.0.0.1:$PORT"
 echo "Pour y accéder depuis ta tablette : openmausbot service install --tunnel (ou --domain TON.DOMAINE), puis openmausbot pair"
