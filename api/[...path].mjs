@@ -6,6 +6,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { inspectSite, toMarkdown } from "../tools/lib/inspect.mjs";
 import { markdownToPdf } from "../tools/lib/pdf.mjs";
+import { MEMBERS, readSkillFile, parseSkill, loadProfile, rules } from "../tools/lib/team.mjs";
 
 // Les espaces et retours à la ligne collés par erreur autour du jeton dans Vercel sont ignorés
 const TOKEN = (process.env.ATELIER_SETTINGS_TOKEN || "").trim();
@@ -55,6 +56,28 @@ export default async function handler(req, res) {
     const url = new URL(req.url, "http://localhost");
     const path = url.pathname.replace(/\/+$/, "");
     const body = req.method === "GET" ? {} : bodyOf(req);
+
+    // --- Catalogue de l'équipe (lecture seule, tiré du dépôt) ---
+    if (req.method === "GET" && path === "/api/catalog") {
+      try {
+        const test = loadProfile("test");
+        const prod = loadProfile("prod");
+        const agents = MEMBERS.map((m) => {
+          const raw = readSkillFile(m.key);
+          const parsed = parseSkill(raw, m.key);
+          return {
+            key: m.key, name: m.name, title: m.title, color: m.color,
+            description: parsed.description,
+            skill: raw,
+            models: { test: test.roles[m.key]?.model || test.default, prod: prod.roles[m.key]?.model || prod.default },
+          };
+        });
+        return send(res, 200, { agents, rules: rules(), provider: prod.provider });
+      } catch (e) {
+        console.error("Catalogue illisible :", e?.message || e);
+        return send(res, 500, { error: "Les fichiers de l'équipe sont absents de ce déploiement." });
+      }
+    }
 
     // --- Outils sans état, exécutés sur Vercel ---
     if (req.method === "POST" && path === "/api/inspect") {

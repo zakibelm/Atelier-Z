@@ -6,7 +6,7 @@
   "functions": {
     "api/[...path].mjs": {
       "maxDuration": 60,
-      "includeFiles": "node_modules/pdfkit/js/**"
+      "includeFiles": "{node_modules/pdfkit/js/**,skills/**,docs/**,config/models.json,config/models.test.json}"
     }
   },
   "headers": [

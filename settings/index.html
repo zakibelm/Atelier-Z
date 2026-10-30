@@ -39,6 +39,7 @@
   label.choice input { width:20px; height:20px; }
   select { font:inherit; color:inherit; background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:10px 12px; min-height:44px; }
   #inspOut { min-height:260px; margin-top:12px; }
+  pre.skillview { white-space:pre-wrap; word-break:break-word; background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:12px; font:13px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; max-height:340px; overflow:auto; }
 </style>
 </head>
 <body>
@@ -113,6 +114,10 @@
     </section>
 
     <section class="card" id="banner" hidden></section>
+
+    <h2 data-only="offline" hidden>L'équipe (lecture seule)</h2>
+    <p class="hint" data-only="offline" hidden>Tirée du dépôt : le rôle, le skill et les modèles conseillés de chaque agent. Pour les modifier, relie le serveur du VPS.</p>
+    <div id="catalog" data-only="offline" hidden></div>
 
     <h2 class="tool">Outils de mission</h2>
     <section class="card tool">
@@ -282,6 +287,7 @@ function backendMode(ok, msg) {
   for (const el of $("app").children) {
     const keep = el.classList.contains("tool");
     if (el.id === "banner") { el.hidden = ok; if (!ok) { el.textContent = msg; } continue; }
+    if (el.dataset.only === "offline") { el.hidden = ok; continue; }
     el.hidden = ok ? false : !keep;
   }
   if (!ok) { // sans serveur relié, le PDF se fait à partir d'un texte collé
@@ -290,10 +296,30 @@ function backendMode(ok, msg) {
   }
 }
 
+async function loadCatalog() {
+  const box = $("catalog");
+  try {
+    const c = await api("GET", "/api/catalog");
+    box.textContent = "";
+    for (const a of c.agents) {
+      const skill = el("pre", { class: "skillview" });
+      skill.textContent = a.skill;
+      box.append(el("article", { class: "card" },
+        el("div", { class: "head" }, el("div", null, el("h3", { text: a.name }), el("p", { text: a.title }))),
+        el("p", { text: a.description }),
+        el("p", { class: "hint", text: "Modèle conseillé : test " + a.models.test + " · production " + a.models.prod }),
+        el("details", null, el("summary", { text: "Voir le skill (instructions de l'agent)" }), skill)));
+    }
+    const rules = el("pre", { class: "skillview" });
+    rules.textContent = c.rules;
+    box.append(el("article", { class: "card" }, el("div", { class: "head" }, el("h3", { text: "Règles du salon" })), el("details", null, el("summary", { text: "Voir les règles" }), rules)));
+  } catch (e) { box.textContent = ""; box.append(el("p", { class: "hint", text: "Équipe indisponible : " + e.message })); }
+}
+
 async function load() {
   let s, mods;
   try { [s, mods] = await Promise.all([api("GET", "/api/state"), api("GET", "/api/models")]); }
-  catch (e) { if (e.code === "no-backend") { backendMode(false, e.message); return; } throw e; }
+  catch (e) { if (e.code === "no-backend") { backendMode(false, e.message); loadCatalog(); return; } throw e; }
   backendMode(true);
   source = s.provider;
   applySource();
