@@ -46,6 +46,21 @@ Voir [docs/regles-salon.md](docs/regles-salon.md).
 
 À la demande (« génère le rapport »), le rédacteur compile les décisions et le plan d'action (gains rapides, moyen terme, stratégique) en PDF. Rien n'est envoyé à un client sans validation humaine.
 
+## Installation
+
+Prérequis : Node 24+, et un CLI d'agent connecté sur la machine (par exemple `claude login`).
+
+```bash
+git clone https://github.com/zakibelm/Atelier-Z && cd Atelier-Z
+bash scripts/install.sh
+```
+
+Le script installe OpenMausBot, démarre le serveur, génère l'équipe à partir des skills (`tools/build-team.mjs` → `team/atelier-z.team.json`) et crée le salon « Atelier de recherche » avec les 10 bots (`tools/setup-atelier.mjs`). Les règles du salon deviennent le bulletin du salon ; le chef d'atelier est le répondant par défaut, et `@nom` interpelle un agent précis.
+
+Pour modifier un rôle : éditer son `skills/<nom>/SKILL.md`, puis relancer `node tools/build-team.mjs`.
+
+État du test (2026-10-30) : installation et création du salon vérifiées (10 bots, salon configuré). Le premier échange avec les agents n'a pas pu être testé : le CLI Claude de l'environnement de test n'était pas connecté (erreur d'authentification). À valider sur le VPS après `claude login`.
+
 ## Infrastructure envisagée
 
 - Salle de discussion : OpenMausBot (open source, Apache-2.0, auto-hébergeable) à tester sur le VPS, avec les CLI d'agents (Claude, Codex).
