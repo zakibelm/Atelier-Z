@@ -5,6 +5,7 @@
 set -euo pipefail
 
 PORT="${1:-8799}"
+PROFILE="${ATELIER_PROFILE:-test}"   # test = modèles bon marché ; prod = config/models.json
 DATA="${2:-$HOME/.atelier-z/data}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
@@ -33,7 +34,7 @@ fi
 
 node "$ROOT/tools/build-team.mjs"
 node "$ROOT/tools/setup-atelier.mjs" "http://127.0.0.1:$PORT"
-node "$ROOT/tools/apply-models.mjs" "http://127.0.0.1:$PORT"
+node "$ROOT/tools/apply-models.mjs" "http://127.0.0.1:$PORT" --profile "$PROFILE"
 
 echo
 echo "Atelier Z est prêt sur http://127.0.0.1:$PORT"

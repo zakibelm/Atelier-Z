@@ -57,7 +57,7 @@ bash scripts/install.sh
 
 Le script installe OpenMausBot, démarre le serveur, génère l'équipe à partir des skills (`tools/build-team.mjs` → `team/atelier-z.team.json`) et crée le salon « Atelier de recherche » avec les 10 bots (`tools/setup-atelier.mjs`). Les règles du salon deviennent le bulletin du salon ; le chef d'atelier est le répondant par défaut, et `@nom` interpelle un agent précis.
 
-Chaque bot reçoit son propre modèle via OpenRouter, défini dans [config/models.json](config/models.json) (`node tools/apply-models.mjs` pour réappliquer). Le fournisseur est un seul champ du fichier : changer de fournisseur ne demande aucune modification de code. Les attributions de départ sont à valider par un test réel sur les mêmes missions, avant de les figer.
+Chaque bot reçoit son propre modèle via OpenRouter. Deux profils : **test** ([config/models.test.json](config/models.test.json), modèles bon marché, utilisé par défaut par l'installation) et **prod** ([config/models.json](config/models.json), modèles de qualité). Pour changer : `node tools/apply-models.mjs --profile prod` (ou `ATELIER_PROFILE=prod bash scripts/install.sh`). Le fournisseur est un seul champ du fichier : changer de fournisseur ne demande aucune modification de code. Les attributions de départ sont à valider par un test réel sur les mêmes missions, avant de les figer.
 
 Pour modifier un rôle : éditer son `skills/<nom>/SKILL.md`, puis relancer `node tools/build-team.mjs`.
 

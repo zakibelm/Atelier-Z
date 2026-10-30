@@ -1,0 +1,17 @@
+{
+  "_note": "Profil de test à faible coût (octobre 2026). Tous les agents sur des modèles bon marché ; le vérificateur reste sur une autre famille de modèles pour garder une contre-vérification indépendante. Pour du gratuit (limité en débit, risqué avec des agents en parallèle), remplacer par un identifiant se terminant par ':free'. Les identifiants doivent être revérifiés avec la clé OpenRouter.",
+  "provider": "openrouter",
+  "default": "deepseek/deepseek-v4.1-flash",
+  "roles": {
+    "chef-atelier": { "model": "deepseek/deepseek-v4.1-flash", "why": "Test : coût minimal" },
+    "orchestrateur": { "model": "deepseek/deepseek-v4.1-flash", "why": "Test : coût minimal" },
+    "cadrage": { "model": "deepseek/deepseek-v4.1-flash", "why": "Test : coût minimal" },
+    "audit-site-technique": { "model": "deepseek/deepseek-v4.1-flash", "why": "Test : coût minimal" },
+    "audit-contenu-message": { "model": "deepseek/deepseek-v4.1-flash", "why": "Test : coût minimal" },
+    "analyse-concurrents": { "model": "deepseek/deepseek-v4.1-flash", "why": "Test : coût minimal" },
+    "analyse-audience-geo": { "model": "deepseek/deepseek-v4.1-flash", "why": "Test : coût minimal" },
+    "verification-sources": { "model": "anthropic/claude-haiku-5.5", "why": "Test : famille différente des chercheurs, environ 0,10 $ US par million de jetons en entrée" },
+    "synthese-strategique": { "model": "deepseek/deepseek-v4.1-flash", "why": "Test : coût minimal" },
+    "redaction-rapport-pdf": { "model": "deepseek/deepseek-v4.1-flash", "why": "Test : coût minimal" }
+  }
+}
