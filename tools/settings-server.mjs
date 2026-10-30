@@ -12,6 +12,7 @@ import { timingSafeEqual } from "node:crypto";
 import {
   root, MEMBERS, skillPath, readSkillFile, parseSkill, buildSoul,
   loadProfile, loadLocal, saveLocalModel, clearLocalModels, modelFor, MODEL_ID,
+  PROVIDERS, getProvider, setProvider, modelIdOk,
 } from "./lib/team.mjs";
 
 const OMB = (process.env.OMB_URL || "http://127.0.0.1:8799").replace(/\/$/, "");
@@ -80,6 +81,15 @@ function suggestedModels() {
   return [...ids].sort().map((id) => ({ id, name: id, context: null, in: null, out: null }));
 }
 
+// Modèles exposés par la passerelle compatible OpenAI (ex. OmniRoute), lus par OpenMausBot avec la clé enregistrée.
+async function gatewayModels() {
+  try {
+    const v = await omb("POST", "/api/keys/test", { provider: "openaiCompat" });
+    if (v.ok && Array.isArray(v.models)) return v.models.map((id) => ({ id, name: id, context: null, in: null, out: null }));
+  } catch {}
+  return null;
+}
+
 async function readBody(req) {
   let size = 0;
   const chunks = [];
@@ -117,6 +127,7 @@ function authorize(req) {
 async function state() {
   const [{ bots }, config] = await Promise.all([omb("GET", "/api/bots"), omb("GET", "/api/config")]);
   const prof = loadProfile("test");
+  const provider = getProvider();
   const local = loadLocal();
   const agents = MEMBERS.map((m) => {
     const bot = bots.find((b) => b.name === m.name);
@@ -127,12 +138,17 @@ async function state() {
       color: m.color,
       present: !!bot,
       model: bot?.modelSelection?.model || "",
-      provider: bot?.modelSelection?.instanceId || prof.provider,
+      provider: bot?.modelSelection?.instanceId || provider,
       customModel: !!local.roles?.[m.key],
       skill: readSkillFile(m.key),
     };
   });
-  return { openrouterConfigured: !!config.openrouter?.configured, provider: prof.provider, agents };
+  return {
+    openrouterConfigured: !!config.openrouter?.configured,
+    gateway: { configured: !!config.openaiCompat?.configured, url: config.openaiCompat?.url || "" },
+    provider,
+    agents,
+  };
 }
 
 function botFor(bots, member) {
@@ -147,8 +163,54 @@ async function route(req, url) {
   if (req.method === "GET" && p === "/api/state") return state();
 
   if (req.method === "GET" && p === "/api/models") {
+    if (getProvider() === "openaiCompat") {
+      const live = await gatewayModels();
+      return { live: !!live, source: "openaiCompat", models: live || [] };
+    }
     const live = await modelCatalog();
-    return { live: !!live, models: live || suggestedModels() };
+    return { live: !!live, source: "openrouter", models: live || suggestedModels() };
+  }
+
+  if (req.method === "PUT" && p === "/api/source") {
+    const { provider } = await readBody(req);
+    if (!PROVIDERS.includes(provider)) throw new HttpError(400, "Source d'IA inconnue");
+    setProvider(provider);
+    return { saved: true, provider };
+  }
+
+  if (req.method === "PUT" && p === "/api/gateway") {
+    const { url, key } = await readBody(req);
+    if (url === "" && (key === "" || key === undefined)) {
+      await omb("PATCH", "/api/config", { openaiCompat: { url: "", key: "" } });
+      return { saved: true, cleared: true };
+    }
+    if (typeof url !== "string" || url.length > 2048 || !/^https?:\/\/[^\s]+$/i.test(url.trim())) throw new HttpError(400, "L'adresse doit commencer par http:// ou https:// (ex. http://adresse:port/v1)");
+    if (key !== undefined && (typeof key !== "string" || key.length > 512)) throw new HttpError(400, "Clé invalide");
+    const body = { provider: "openaiCompat", url: url.trim() };
+    if (typeof key === "string" && key.trim()) body.key = key.trim();
+    const verdict = await omb("POST", "/api/keys/test", body);
+    if (verdict.ok === false && verdict.reason === "rejected") throw new HttpError(400, "La passerelle a refusé cette clé.");
+    const patch = { url: url.trim() };
+    if (body.key) patch.key = body.key;
+    await omb("PATCH", "/api/config", { openaiCompat: patch });
+    modelCache = { at: 0, list: null };
+    return { saved: true, verified: verdict.ok === true, models: Array.isArray(verdict.models) ? verdict.models.length : null };
+  }
+
+  if (req.method === "POST" && p === "/api/bulk-model") {
+    const { model } = await readBody(req);
+    const provider = getProvider();
+    if (!modelIdOk(provider, typeof model === "string" ? model.trim() : model)) throw new HttpError(400, "Identifiant de modèle invalide pour cette source");
+    const { bots } = await omb("GET", "/api/bots");
+    let n = 0;
+    for (const member of MEMBERS) {
+      const bot = bots.find((b) => b.name === member.name);
+      if (!bot) continue;
+      await omb("PATCH", `/api/bots/${bot.id}`, { modelSelection: { instanceId: provider, model: model.trim() } });
+      saveLocalModel(member.key, model.trim());
+      n++;
+    }
+    return { saved: true, agents: n };
   }
 
   if (req.method === "PUT" && p === "/api/openrouter-key") {
@@ -177,8 +239,8 @@ async function route(req, url) {
 
     if (body.model !== undefined) {
       const model = String(body.model).trim();
-      if (model.length > 128 || !MODEL_ID.test(model)) throw new HttpError(400, "Identifiant de modèle invalide (format attendu : fournisseur/modèle)");
-      const provider = loadProfile("test").provider;
+      const provider = getProvider();
+      if (!modelIdOk(provider, model)) throw new HttpError(400, provider === "openaiCompat" ? "Identifiant de modèle invalide" : "Identifiant de modèle invalide (format attendu : fournisseur/modèle)");
       await omb("PATCH", `/api/bots/${bot.id}`, { modelSelection: { instanceId: provider, model } });
       saveLocalModel(member.key, model);
       out.model = model;
@@ -199,6 +261,7 @@ async function route(req, url) {
   if (req.method === "POST" && p === "/api/profile") {
     const { profile } = await readBody(req);
     if (!["test", "prod"].includes(profile)) throw new HttpError(400, "Profil inconnu");
+    if (getProvider() !== "openrouter") throw new HttpError(400, "Les profils test et production utilisent des modèles OpenRouter. Choisis la source OpenRouter, ou règle chaque agent avec les modèles de ta passerelle.");
     clearLocalModels();
     const data = loadProfile(profile);
     const { bots } = await omb("GET", "/api/bots");

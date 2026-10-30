@@ -104,3 +104,28 @@ export function modelFor(key, profileData, local = loadLocal()) {
 }
 
 export const MODEL_ID = /^[A-Za-z0-9][\w.-]*\/[\w.:-]+$/;
+
+// --- Source d'IA : openrouter (direct) ou openaiCompat (passerelle compatible OpenAI, ex. OmniRoute) ---
+export const PROVIDERS = ["openrouter", "openaiCompat"];
+const providerFile = join(root, "config", "provider.local.json");
+
+export function getProvider() {
+  if (existsSync(providerFile)) {
+    const p = JSON.parse(readFileSync(providerFile, "utf8")).provider;
+    if (PROVIDERS.includes(p)) return p;
+  }
+  return loadProfile("test").provider;
+}
+
+export function setProvider(provider) {
+  if (!PROVIDERS.includes(provider)) throw new Error("Source d'IA inconnue");
+  mkdirSync(dirname(providerFile), { recursive: true });
+  writeFileSync(providerFile, JSON.stringify({ provider }, null, 2) + "\n");
+}
+
+// Identifiant de modèle valide pour la source : fournisseur/modèle pour OpenRouter,
+// nom libre pour une passerelle (alias ou combo définis dans la passerelle).
+export function modelIdOk(provider, id) {
+  if (typeof id !== "string" || id.length > 128) return false;
+  return provider === "openaiCompat" ? /^[A-Za-z0-9][\w.:@/+-]*$/.test(id) : MODEL_ID.test(id);
+}

@@ -6,7 +6,7 @@
 //   sauf avec --reset-local qui les efface.
 // La clé OpenRouter n'est jamais écrite dans le dépôt : elle se saisit dans la page de paramètres
 // (ou OMB_OPENROUTER_API_KEY au démarrage du serveur).
-import { MEMBERS, loadProfile, loadLocal, clearLocalModels, modelFor } from "./lib/team.mjs";
+import { MEMBERS, loadProfile, loadLocal, clearLocalModels, modelFor, getProvider } from "./lib/team.mjs";
 
 const args = process.argv.slice(2);
 const pi = args.indexOf("--profile");
@@ -17,7 +17,7 @@ if (!["test", "prod"].includes(profile)) { console.error("Profil inconnu : utili
 const base = (args[0] || "http://127.0.0.1:8799").replace(/\/$/, "");
 
 if (reset) clearLocalModels();
-const models = loadProfile(profile);
+const models = { ...loadProfile(profile), provider: getProvider() };
 const local = loadLocal();
 console.log(`Profil : ${profile}${reset ? " (choix locaux effacés)" : Object.keys(local.roles || {}).length ? " + choix locaux" : ""}`);
 

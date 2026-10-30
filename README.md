@@ -67,8 +67,9 @@ Pour modifier un rôle : éditer son `skills/<nom>/SKILL.md`, puis relancer `nod
 
 `bash scripts/install.sh` démarre aussi la page de paramètres (`tools/settings-server.mjs`, port 8801, écoute locale seulement). Elle permet de :
 
+- **choisir la source d'IA** : OpenRouter en direct, ou OmniRoute (toute passerelle compatible OpenAI) avec son adresse et sa clé d'accès. Le choix est gardé dans `config/provider.local.json` (non versionné) ;
 - **saisir ta clé OpenRouter** : elle est testée puis transmise à OpenMausBot, qui la garde dans son dossier de données. Elle n'est jamais écrite dans le dépôt ni réaffichée ;
-- **choisir le modèle d'IA de chaque agent** : liste complète d'OpenRouter avec les prix par million de jetons (saisie libre possible), ou profil rapide test / production ;
+- **choisir le modèle d'IA de chaque agent** : liste d'OpenRouter avec les prix par million de jetons, ou liste des modèles exposés par ta passerelle (saisie libre possible, alias acceptés avec OmniRoute). Un profil rapide test / production (OpenRouter) et un bouton « même modèle pour tous » sont aussi proposés ;
 - **modifier le skill de chaque agent** : le fichier `skills/<agent>/SKILL.md` est mis à jour et les instructions du bot sont appliquées tout de suite.
 
 Les choix de modèles faits dans la page sont gardés dans `config/models.local.json` (non versionné) et priment sur les profils.

@@ -5,6 +5,7 @@
 
 # Choix de modèles faits depuis la page de paramètres (propres à chaque installation)
 config/models.local.json
+config/provider.local.json
 
 # Données locales du serveur
 data/
