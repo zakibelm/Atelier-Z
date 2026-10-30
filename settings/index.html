@@ -39,6 +39,12 @@
   label.choice input { width:20px; height:20px; }
   select { font:inherit; color:inherit; background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:10px 12px; min-height:44px; }
   #inspOut { min-height:260px; margin-top:12px; }
+  #chat { max-height:420px; overflow:auto; display:flex; flex-direction:column; gap:10px; padding:4px 2px 10px; }
+  .msg { background:var(--bg); border:1px solid var(--line); border-radius:10px; padding:10px 12px; }
+  .msg.me { border-color:var(--accent); }
+  .msg.sys { opacity:.8; font-style:italic; }
+  .msg .who { font-size:12px; color:var(--muted); margin-bottom:4px; }
+  .msg .txt { white-space:pre-wrap; word-break:break-word; }
   pre.skillview { white-space:pre-wrap; word-break:break-word; background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:12px; font:13px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; max-height:340px; overflow:auto; }
 </style>
 </head>
@@ -115,9 +121,51 @@
 
     <section class="card" id="banner" hidden></section>
 
-    <h2 data-only="offline" hidden>L'équipe (lecture seule)</h2>
-    <p class="hint" data-only="offline" hidden>Tirée du dépôt : le rôle, le skill et les modèles conseillés de chaque agent. Pour les modifier, relie le serveur du VPS.</p>
-    <div id="catalog" data-only="offline" hidden></div>
+    <div id="direct" data-only="offline" hidden>
+      <h2>Connexion à OmniRoute</h2>
+      <section class="card">
+        <div class="head"><div><strong>Statut</strong> <span id="omStatus" class="badge off">non configurée</span></div></div>
+        <label for="omUrl">Adresse de l'API (compatible OpenAI)</label>
+        <input type="text" id="omUrl" placeholder="https://ton-vps.ton-reseau.ts.net/v1" autocomplete="off" spellcheck="false" inputmode="url">
+        <label for="omKey">Clé d'accès OmniRoute</label>
+        <input type="password" id="omKey" placeholder="laisser vide pour garder la clé enregistrée" autocomplete="off" spellcheck="false">
+        <p class="hint">La tablette doit être sur Tailscale. L'adresse doit être en HTTPS (cette page l'est). La clé reste dans ce navigateur : elle n'est envoyée qu'à ton OmniRoute et n'est jamais stockée sur Vercel.</p>
+        <div class="row">
+          <button class="primary" id="omSave" type="button">Tester et enregistrer</button>
+          <button id="omClear" type="button">Effacer</button>
+        </div>
+      </section>
+
+      <h2>Salon</h2>
+      <section class="card">
+        <div id="chat" role="log" aria-live="polite"></div>
+        <label for="chatIn">Ton message (ou @Nom pour interpeller un agent)</label>
+        <textarea id="chatIn" placeholder="Sans @, le Chef d'atelier répond et délègue au besoin. Ctrl+Entrée pour envoyer."></textarea>
+        <div class="row">
+          <button class="primary" id="chatSend" type="button">Envoyer</button>
+          <button id="chatStop" type="button" hidden>Arrêter</button>
+          <button id="chatMission" type="button">Mission CO-OP Taxi</button>
+        </div>
+        <p id="chatMeta" class="hint"></p>
+        <div class="row">
+          <label class="choice" for="limCalls">Appels max par message <input type="text" inputmode="numeric" id="limCalls" size="3" style="width:64px;min-height:36px"></label>
+          <label class="choice" for="limTokens">Réponse max (jetons) <input type="text" inputmode="numeric" id="limTokens" size="5" style="width:84px;min-height:36px"></label>
+        </div>
+        <div class="row">
+          <button id="chatExport" type="button">Exporter le salon</button>
+          <button id="chatClear" type="button">Vider le salon</button>
+        </div>
+      </section>
+
+      <h2>Agents</h2>
+      <section class="card">
+        <label for="bulkDModel">Un même modèle pour les 10 agents</label>
+        <input type="text" id="bulkDModel" list="dModels" autocomplete="off" spellcheck="false">
+        <div class="row"><button id="bulkDBtn" type="button">Appliquer à tous</button></div>
+      </section>
+      <datalist id="dModels"></datalist>
+      <div id="dAgents"></div>
+    </div>
 
     <h2 class="tool">Outils de mission</h2>
     <section class="card tool">
@@ -290,36 +338,12 @@ function backendMode(ok, msg) {
     if (el.dataset.only === "offline") { el.hidden = ok; continue; }
     el.hidden = ok ? false : !keep;
   }
-  if (!ok) { // sans serveur relié, le PDF se fait à partir d'un texte collé
-    document.querySelector("input[name=repSrc][value=paste]").checked = true;
-    $("repText").hidden = false;
-  }
-}
-
-async function loadCatalog() {
-  const box = $("catalog");
-  try {
-    const c = await api("GET", "/api/catalog");
-    box.textContent = "";
-    for (const a of c.agents) {
-      const skill = el("pre", { class: "skillview" });
-      skill.textContent = a.skill;
-      box.append(el("article", { class: "card" },
-        el("div", { class: "head" }, el("div", null, el("h3", { text: a.name }), el("p", { text: a.title }))),
-        el("p", { text: a.description }),
-        el("p", { class: "hint", text: "Modèle conseillé : test " + a.models.test + " · production " + a.models.prod }),
-        el("details", null, el("summary", { text: "Voir le skill (instructions de l'agent)" }), skill)));
-    }
-    const rules = el("pre", { class: "skillview" });
-    rules.textContent = c.rules;
-    box.append(el("article", { class: "card" }, el("div", { class: "head" }, el("h3", { text: "Règles du salon" })), el("details", null, el("summary", { text: "Voir les règles" }), rules)));
-  } catch (e) { box.textContent = ""; box.append(el("p", { class: "hint", text: "Équipe indisponible : " + e.message })); }
 }
 
 async function load() {
   let s, mods;
   try { [s, mods] = await Promise.all([api("GET", "/api/state"), api("GET", "/api/models")]); }
-  catch (e) { if (e.code === "no-backend") { backendMode(false, e.message); loadCatalog(); return; } throw e; }
+  catch (e) { if (e.code === "no-backend") { backendMode(false, e.message); if (window.initDirect) window.initDirect(); return; } throw e; }
   backendMode(true);
   source = s.provider;
   applySource();
@@ -388,6 +412,7 @@ $("inspBtn").addEventListener("click", async () => {
   btn.disabled = false;
 });
 $("inspRoom").addEventListener("click", async () => {
+  if (window.directMode) { window.postLocal("Inspection (inspect-url)", $("inspOut").value.slice(0, 7000)); toast("Résumé ajouté au salon : interpelle @Site et technique"); return; }
   try { await api("POST", "/api/inspect/room", { markdown: $("inspOut").value }); toast("Résumé envoyé au salon"); }
   catch (e) { toast(e.message, true); }
 });
@@ -399,7 +424,12 @@ $("repBtn").addEventListener("click", async () => {
   const fromRoom = document.querySelector("input[name=repSrc]:checked").value === "room";
   btn.disabled = true;
   try {
-    const { blob, name } = await apiBlob("/api/report-pdf", { fromRoom, markdown: $("repText").value, title: $("repTitle").value.trim(), client: $("repClient").value.trim(), draft: $("repDraft").checked });
+    let md = $("repText").value;
+    if (fromRoom && window.directMode) {
+      md = window.localReport() || "";
+      if (!md) { toast("Aucun rapport du Rédacteur dans le salon. Demande-lui : @Rédacteur génère le rapport.", true); btn.disabled = false; return; }
+    }
+    const { blob, name } = await apiBlob("/api/report-pdf", { fromRoom: fromRoom && !window.directMode, markdown: md, title: $("repTitle").value.trim(), client: $("repClient").value.trim(), draft: $("repDraft").checked });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
     a.download = name;
@@ -448,6 +478,310 @@ $("tokenBtn").addEventListener("click", () => {
 });
 
 loadSafe();
+</script>
+<script>
+(function () {
+  "use strict";
+  // Mode API directe : le navigateur appelle OmniRoute (ou toute API compatible OpenAI) ; rien n'est stocké sur Vercel.
+  const LS = {
+    get(k, d) { try { const v = localStorage.getItem("atz." + k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+    set(k, v) { try { localStorage.setItem("atz." + k, JSON.stringify(v)); return true; } catch { return false; } },
+  };
+  const norm = (s) => String(s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[’]/g, "'");
+  const ALIASES = {
+    "chef-atelier": ["chef"], orchestrateur: ["orchestrateur"], cadrage: ["cadrage"],
+    "audit-site-technique": ["site", "technique"], "audit-contenu-message": ["contenu"],
+    "analyse-concurrents": ["concurrents", "concurrent"], "analyse-audience-geo": ["audience", "geo"],
+    "verification-sources": ["verificateur"], "synthese-strategique": ["stratege", "strategie"], "redaction-rapport-pdf": ["redacteur", "redaction"],
+  };
+  const MISSION = "Mission : audit marketing de CO-OP Taxi Terrebonne. Objectif : plus de courses réservées (individuels), puis contrats d'entreprises. Argument : tarif fixe réglementé contre tarification dynamique d'Uber. Pilote de 3 mois sans frais, budget publicitaire 0 $. Français du Québec, conforme Loi 25 et CASL. Chef d'atelier : valide la fiche de mission avec moi, puis planifie les phases. Aucune affirmation sans source.";
+
+  let agents = [], rules = "", lead = null;
+  let skills = LS.get("skills", {}), models = LS.get("models", {});
+  let conn = LS.get("omni", { url: "", key: "" });
+  let limits = LS.get("limits", { calls: 8, tokens: 1200 });
+  let chat = LS.get("chat", []);
+  let busy = null, pending = [], usage = { calls: 0, tokens: 0 };
+
+  const base = () => conn.url.trim().replace(/\/+$/, "");
+  const namesOf = (a) => [norm(a.name), a.key, ...(ALIASES[a.key] || [])];
+  const skillOf = (a) => (skills[a.key] !== undefined ? skills[a.key] : a.skill);
+
+  // ---------- Salon ----------
+  function save() { LS.set("chat", chat.slice(-200)); }
+  function post(from, text, kind) {
+    chat.push({ from, text: String(text).slice(0, 20000), t: Date.now(), kind: kind || "" });
+    save(); renderChat();
+  }
+  window.postLocal = (from, text) => post(from, text, "info");
+  window.localReport = () => {
+    for (let i = chat.length - 1; i >= 0; i--) if (chat[i].from === "Rédacteur" && chat[i].text.trim().length > 40) return chat[i].text;
+    return null;
+  };
+
+  function renderChat() {
+    const box = $("chat");
+    if (!box) return;
+    box.textContent = "";
+    for (const m of chat) {
+      const who = m.from;
+      const row = el("div", { class: "msg" + (who === "Vous" ? " me" : m.kind === "sys" ? " sys" : "") });
+      row.append(el("div", { class: "who", text: who + "  ·  " + new Date(m.t).toLocaleTimeString("fr-CA", { hour: "2-digit", minute: "2-digit" }) }));
+      const body = el("div", { class: "txt" });
+      body.textContent = m.text;
+      row.append(body);
+      box.append(row);
+    }
+    for (const p of pending) box.append(el("div", { class: "msg sys" }, el("div", { class: "txt", text: p + " écrit…" })));
+    box.scrollTop = box.scrollHeight;
+  }
+
+  function updateMeta() {
+    $("chatMeta").textContent = "Appels : " + usage.calls + " / " + limits.calls + "  ·  Jetons utilisés : " + usage.tokens.toLocaleString("fr-CA") + (busy ? "  ·  en cours…" : "");
+  }
+
+  function mentionsIn(text) {
+    const n = norm(text);
+    return agents.filter((a) => namesOf(a).some((nm) => n.includes("@" + nm)));
+  }
+
+  function findAtStart(s) {
+    const n = norm(s);
+    let best = null;
+    for (const a of agents) for (const nm of namesOf(a)) if (n.startsWith(nm) && (!best || nm.length > best.len)) best = { a, len: nm.length };
+    return best ? { agent: best.a, rest: s.slice(best.len) } : null;
+  }
+
+  // Seuls le Chef d'atelier et l'Orchestrateur peuvent déléguer (évite les boucles et les coûts).
+  function delegationsFrom(text, key) {
+    if (key !== "chef-atelier" && key !== "orchestrateur") return [];
+    const out = [];
+    let cur = null;
+    for (const line of text.split("\n")) {
+      const m = line.match(/^\s*[-*]?\s*@(.+)$/);
+      const hit = m && findAtStart(m[1]);
+      if (hit) { cur = { agent: hit.agent, task: hit.rest.replace(/^\s*[:\-–]\s*/, "").trim() }; out.push(cur); }
+      else if (cur && line.trim()) cur.task += " " + line.trim();
+    }
+    return out.filter((d) => d.agent.key !== key && d.task);
+  }
+
+  function soul(a) {
+    const roster = agents.map((x) => "- " + x.name + " : " + x.title).join("\n");
+    const body = skillOf(a).replace(/^---\n[\s\S]*?\n---\n/, "").trim();
+    let s = "Tu fais partie d'Atelier Z, une équipe d'agents dans un salon de réunion avec l'utilisateur. Réponds en français du Québec. Tu es « " + a.name + " ». Équipe du salon :\n" + roster +
+      "\n\nRespecte les règles du salon (silence par défaut, source obligatoire, validation humaine avant toute action risquée). Quand tu signales un problème, donne toujours l'action et le bénéfice. Montants en dollars canadiens (CAD). Tu n'as accès à aucun outil : n'invente jamais un fait sur un site ou un concurrent ; s'il manque une donnée, dis-le et demande-la.\n\n" + body;
+    if (a.key === "chef-atelier" || a.key === "orchestrateur") {
+      s += "\n\n## Délégation (obligatoire pour faire travailler l'équipe)\nPour confier une tâche, écris une ligne par agent, au début de la ligne : `@Nom exact : consigne précise et autonome`. Noms exacts : " + agents.map((x) => x.name).join(", ") + ". Ne délègue qu'au besoin (silence par défaut). Les agents ne voient que le fil du salon et ta consigne.";
+    }
+    return s + "\n\n## Règles du salon\n" + rules;
+  }
+
+  function context(task) {
+    let t = chat.filter((m) => m.kind !== "sys").map((m) => "[" + m.from + "] " + m.text).join("\n\n");
+    if (t.length > 14000) t = "(…début du fil omis…)\n" + t.slice(-14000);
+    return "Fil récent du salon :\n" + (t || "(vide)") + "\n\nCe qu'on te demande maintenant : " + task;
+  }
+
+  const hintNet = "Impossible de joindre OmniRoute depuis ce navigateur. Causes possibles : Tailscale inactif sur la tablette, adresse non HTTPS (cette page est en HTTPS), ou OmniRoute qui n'autorise pas les appels depuis cette page (CORS).";
+
+  async function callAgent(a, task, signal) {
+    const model = models[a.key];
+    if (!model) throw new Error("Aucun modèle choisi pour « " + a.name + " ». Choisis-le plus bas, dans sa carte.");
+    const headers = { "content-type": "application/json" };
+    if (conn.key) headers.authorization = "Bearer " + conn.key;
+    const ctl = new AbortController();
+    const onAbort = () => ctl.abort();
+    signal.addEventListener("abort", onAbort);
+    const timer = setTimeout(() => ctl.abort(), 120000);
+    let res;
+    try {
+      res = await fetch(base() + "/chat/completions", {
+        method: "POST", headers, signal: ctl.signal,
+        body: JSON.stringify({ model, max_tokens: Number(limits.tokens) || 1200, temperature: 0.3, messages: [{ role: "system", content: soul(a) }, { role: "user", content: context(task) }] }),
+      });
+    } catch (e) {
+      if (signal.aborted) throw new Error("Arrêté.");
+      if (ctl.signal.aborted) throw new Error("« " + a.name + " » n'a pas répondu en 2 minutes.");
+      throw new Error(hintNet);
+    } finally { clearTimeout(timer); signal.removeEventListener("abort", onAbort); }
+    if (!res.ok) {
+      const t = (await res.text().catch(() => "")).slice(0, 300);
+      throw new Error("OmniRoute a répondu " + res.status + (t ? " : " + t : ""));
+    }
+    const j = await res.json();
+    usage.calls++;
+    usage.tokens += Number(j.usage && j.usage.total_tokens) || 0;
+    return String((j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || "").trim();
+  }
+
+  async function runOne(step, signal) {
+    pending.push(step.agent.name); renderChat(); updateMeta();
+    try {
+      const text = await callAgent(step.agent, step.task, signal);
+      pending = pending.filter((n) => n !== step.agent.name);
+      post(step.agent.name, text || "(réponse vide)");
+      return { agent: step.agent, text };
+    } catch (e) {
+      pending = pending.filter((n) => n !== step.agent.name);
+      post("Système", e.message, "sys");
+      return { agent: step.agent, text: "" };
+    }
+  }
+
+  function setBusy(on) {
+    $("chatSend").disabled = on;
+    $("chatStop").hidden = !on;
+    updateMeta();
+  }
+
+  async function send(text) {
+    if (busy) return;
+    if (!conn.url) { toast("Configure d'abord la connexion à OmniRoute", true); return; }
+    if (!agents.length) { toast("L'équipe n'est pas chargée", true); return; }
+    post("Vous", text);
+    const ctl = new AbortController();
+    busy = ctl; usage = { calls: 0, tokens: 0 }; setBusy(true);
+    try {
+      let queue = mentionsIn(text).map((a) => ({ agent: a, task: text }));
+      const viaLead = queue.length === 0;
+      if (viaLead) queue = [{ agent: lead, task: text }];
+      let rounds = 0, delegated = false;
+      while (queue.length && rounds < 3 && !ctl.signal.aborted) {
+        const room = limits.calls - usage.calls;
+        if (room <= 0) { post("Système", "Plafond de " + limits.calls + " appels atteint pour ce message. Relance ou augmente le plafond.", "sys"); break; }
+        const seen = new Set();
+        const uniq = queue.filter((s) => !seen.has(s.agent.key) && seen.add(s.agent.key));
+        const batch = uniq.slice(0, room);
+        if (uniq.length > batch.length) post("Système", "Plafond de " + limits.calls + " appels atteint : " + uniq.slice(batch.length).map((s) => s.agent.name).join(", ") + " n'a pas été appelé. Augmente le plafond ou relance.", "sys");
+        const results = await Promise.all(batch.map((s) => runOne(s, ctl.signal)));
+        const next = [];
+        for (const r of results) if (r.text) next.push(...delegationsFrom(r.text, r.agent.key));
+        if (next.length) delegated = true;
+        queue = next; rounds++;
+      }
+      if (delegated && !ctl.signal.aborted && usage.calls < limits.calls) {
+        await runOne({ agent: lead, task: "Résume les retours de l'équipe ci-dessus, tranche les désaccords et propose la suite à l'utilisateur." }, ctl.signal);
+      }
+    } finally {
+      busy = null; pending = []; setBusy(false); renderChat();
+    }
+  }
+
+  // ---------- Connexion ----------
+  function connStatus(ok) {
+    const b = $("omStatus");
+    b.textContent = ok ? "configurée" : "non configurée";
+    b.className = "badge " + (ok ? "ok" : "off");
+  }
+  function fillModels(ids) {
+    const dl = $("dModels");
+    dl.textContent = "";
+    for (const id of ids) dl.append(el("option", { value: id }));
+  }
+  async function listModels(url, key) {
+    const headers = {};
+    if (key) headers.authorization = "Bearer " + key;
+    let res;
+    try { res = await fetch(url.replace(/\/+$/, "") + "/models", { headers, signal: AbortSignal.timeout(15000) }); }
+    catch { const e = new Error(hintNet); e.net = true; throw e; }
+    if (res.status === 401 || res.status === 403) throw new Error("OmniRoute a refusé la clé (" + res.status + ").");
+    if (!res.ok) throw new Error("OmniRoute a répondu " + res.status + ".");
+    const j = await res.json();
+    return (j.data || []).map((m) => m.id).filter(Boolean);
+  }
+
+  // ---------- Agents ----------
+  function agentCard(a) {
+    const mIn = el("input", { type: "text", id: "dm-" + a.key, list: "dModels", autocomplete: "off", spellcheck: "false", value: models[a.key] || "", placeholder: "Nom du modèle dans OmniRoute" });
+    mIn.addEventListener("change", () => { models[a.key] = mIn.value.trim(); LS.set("models", models); toast(a.name + " : modèle enregistré"); });
+    const ta = el("textarea", { id: "ds-" + a.key, spellcheck: "false", "aria-label": "Skill de " + a.name });
+    ta.value = skillOf(a);
+    let saved = ta.value;
+    const dirty = el("span", { class: "badge dirty", text: "modifié, non enregistré" });
+    dirty.hidden = true;
+    ta.addEventListener("input", () => { dirty.hidden = ta.value === saved; });
+    const sBtn = el("button", { type: "button", class: "primary", text: "Enregistrer le skill" });
+    sBtn.addEventListener("click", () => {
+      const m = ta.value.replace(/\r\n/g, "\n").match(/^---\n([\s\S]*?)\n---\n/);
+      if (!m || !/^name:\s*\S+/m.test(m[1]) || !/^description:\s*\S+/m.test(m[1])) { toast("Le skill doit commencer par un en-tête --- name / description ---", true); return; }
+      skills[a.key] = ta.value; LS.set("skills", skills); saved = ta.value; dirty.hidden = true; toast(a.name + " : skill enregistré (utilisé au prochain message)");
+    });
+    const rBtn = el("button", { type: "button", text: "Revenir au skill d'origine" });
+    rBtn.addEventListener("click", () => { delete skills[a.key]; LS.set("skills", skills); ta.value = a.skill; saved = a.skill; dirty.hidden = true; toast(a.name + " : skill d'origine rétabli"); });
+    return el("article", { class: "card" },
+      el("div", { class: "head" }, el("div", null, el("h3", { text: a.name }), el("p", { text: a.title }))),
+      el("p", { class: "hint", text: a.description }),
+      el("label", { for: "dm-" + a.key, text: "Modèle d'IA (OmniRoute)" }), mIn,
+      el("p", { class: "hint", text: "Repère : test " + a.models.test + " · production " + a.models.prod + " (noms OpenRouter, à adapter à ceux d'OmniRoute)" }),
+      el("details", null, el("summary", { text: "Skill (instructions de l'agent)" }),
+        el("p", { class: "hint", text: "Le texte sous l'en-tête devient les instructions de l'agent à chaque appel." }), ta,
+        el("div", { class: "row" }, sBtn, rBtn, dirty)));
+  }
+
+  function renderAgents() {
+    const box = $("dAgents");
+    box.textContent = "";
+    for (const a of agents) box.append(agentCard(a));
+  }
+
+  // ---------- Initialisation (appelée quand aucun serveur VPS n'est relié) ----------
+  window.initDirect = async function () {
+    let c;
+    try { c = await api("GET", "/api/catalog"); } catch (e) { toast("Équipe indisponible : " + e.message, true); return; }
+    agents = c.agents; rules = c.rules; lead = agents.find((a) => a.key === "chef-atelier") || agents[0];
+    window.directMode = true;
+    $("banner").textContent = "Mode API directe : ta tablette appelle OmniRoute depuis ce navigateur. Ta clé, tes modèles, tes skills et le salon restent dans ce navigateur ; Vercel ne stocke rien.";
+    $("omUrl").value = conn.url || "";
+    connStatus(!!conn.url);
+    $("limCalls").value = limits.calls; $("limTokens").value = limits.tokens;
+    renderAgents(); renderChat(); updateMeta();
+    if (conn.url) listModels(conn.url, conn.key).then(fillModels).catch(() => {});
+  };
+
+  $("omSave").addEventListener("click", async () => {
+    const url = $("omUrl").value.trim();
+    const key = $("omKey").value.trim() || conn.key;
+    if (!/^https?:\/\/[^\s]+$/i.test(url)) { toast("L'adresse doit commencer par https:// (ex. https://ton-vps.ton-reseau.ts.net/v1)", true); return; }
+    $("omSave").disabled = true;
+    try {
+      const ids = await listModels(url, key);
+      conn = { url, key }; LS.set("omni", conn); $("omKey").value = ""; connStatus(true); fillModels(ids);
+      toast("OmniRoute joint : " + ids.length + " modèle(s) trouvé(s)");
+    } catch (e) {
+      toast(e.message, true);
+      if (e.net) { /* l'adresse reste à corriger : on n'enregistre pas */ }
+    }
+    $("omSave").disabled = false;
+  });
+  $("omClear").addEventListener("click", () => { conn = { url: "", key: "" }; LS.set("omni", conn); $("omUrl").value = ""; $("omKey").value = ""; connStatus(false); fillModels([]); toast("Connexion effacée de ce navigateur"); });
+
+  for (const id of ["limCalls", "limTokens"]) {
+    $(id).addEventListener("change", () => {
+      limits = { calls: Math.min(Math.max(parseInt($("limCalls").value, 10) || 8, 1), 30), tokens: Math.min(Math.max(parseInt($("limTokens").value, 10) || 1200, 100), 8000) };
+      $("limCalls").value = limits.calls; $("limTokens").value = limits.tokens; LS.set("limits", limits); updateMeta();
+    });
+  }
+  $("chatSend").addEventListener("click", () => { const t = $("chatIn").value.trim(); if (!t) return; $("chatIn").value = ""; send(t); });
+  $("chatIn").addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); $("chatSend").click(); } });
+  $("chatStop").addEventListener("click", () => { if (busy) busy.abort(); });
+  $("chatMission").addEventListener("click", () => { $("chatIn").value = MISSION; $("chatIn").focus(); });
+  $("chatClear").addEventListener("click", () => { if (!confirm("Vider tout le salon de ce navigateur ?")) return; chat = []; save(); renderChat(); });
+  $("chatExport").addEventListener("click", () => {
+    const text = chat.map((m) => "## " + m.from + " (" + new Date(m.t).toLocaleString("fr-CA") + ")\n\n" + m.text).join("\n\n---\n\n");
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([text || "(salon vide)"], { type: "text/markdown" }));
+    a.download = "salon-atelier-z.md";
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+  });
+  $("bulkDBtn").addEventListener("click", () => {
+    const m = $("bulkDModel").value.trim();
+    if (!m) { toast("Saisis un modèle", true); return; }
+    for (const a of agents) models[a.key] = m;
+    LS.set("models", models); renderAgents(); toast(m + " appliqué aux " + agents.length + " agents");
+  });
+})();
 </script>
 </body>
 </html>

@@ -329,7 +329,7 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, {
         "content-type": "text/html; charset=utf-8",
         "cache-control": "no-store",
-        "content-security-policy": "default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; frame-ancestors 'none'",
+        "content-security-policy": "default-src 'self'; connect-src 'self' https:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; frame-ancestors 'none'",
         "x-content-type-options": "nosniff",
       });
       return res.end(page);

@@ -89,7 +89,18 @@ Les deux sont aussi dans la page de paramètres (section « Outils de mission »
 
 Limites : lecture HTML seule (pas de JavaScript exécuté, pas de vitesse réelle ni de Core Web Vitals), les incohérences de prix sont une heuristique à confirmer, et les polices du PDF couvrent le français mais pas les emojis ni certains symboles (retirés ou remplacés).
 
-## Déploiement Vercel + VPS
+## Mode API directe (Vercel + OmniRoute, sans serveur d'agents)
+
+C'est le mode par défaut de la page Vercel quand aucun serveur n'est relié. Un agent est un appel à l'API (compatible OpenAI) d'OmniRoute, avec le texte de son skill comme instructions et le modèle choisi pour lui.
+
+- **Connexion :** adresse et clé d'OmniRoute saisies dans la page, gardées dans le navigateur (jamais sur Vercel). Les appels partent du navigateur : voir [deploy/omniroute-tailscale.md](deploy/omniroute-tailscale.md) pour l'accès privé par Tailscale.
+- **Salon :** le fil de discussion est dans le navigateur (export et vidage possibles). Règles appliquées par le code : silence par défaut (sans `@Nom`, seul le Chef d'atelier répond), seuls le Chef et l'Orchestrateur délèguent (une ligne `@Nom : consigne`), les agents délégués travaillent en parallèle, un plafond d'appels et de jetons par message, bouton Arrêter.
+- **Agents :** modèle et skill de chacun, modifiables dans la page ; « Revenir au skill d'origine » rétablit le texte du dépôt.
+- **Outils :** « Inspecter un site » envoie son résumé au salon ; « Rapport PDF » prend le dernier message du Rédacteur.
+
+Limites : une réponse d'agent est limitée à environ 2 minutes ; les agents n'ont pas d'outils (ils lisent le fil et l'inspection) ; le salon n'est pas partagé entre appareils.
+
+## Déploiement Vercel + VPS (mode serveur)
 
 Vercel ne peut pas héberger le salon : OpenMausBot est un serveur qui reste allumé et garde ses données sur disque. Le partage est donc le suivant.
 
